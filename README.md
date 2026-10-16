@@ -1,6 +1,6 @@
 # Snack Maze
 
-An original maze-chase game — gobble every snack dot, dodge the Grumps, and turn the tables with a power apple.
+An original garden maze-chase game — guide the turtle, gobble every berry, dodge the slugs, and turn the tables with a power strawberry.
 
 Live page: https://jesuslovestyler.github.io/Snack-maze/
 
