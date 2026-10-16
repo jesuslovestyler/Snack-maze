@@ -1,0 +1,1256 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>Snack Maze</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #e9f0fc;
+        --ink: #17233f;
+        --muted: #5a6a8c;
+        --panel: #ffffff;
+        --panel-edge: #d4def2;
+        --chip: #f2f6ff;
+        --gold: #ffb703;
+        --gold-deep: #f59e0b;
+        --gold-ink: #422006;
+        --board-bg: #0a0f2e;
+        --btn: #22306b;
+        --btn-ink: #eaf0ff;
+        --shadow: 0 10px 28px rgba(23, 35, 63, 0.16);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #060a1c;
+          --ink: #eef2ff;
+          --muted: #9fb0d8;
+          --panel: #101736;
+          --panel-edge: #26336b;
+          --chip: #182046;
+          --btn: #26336b;
+          --btn-ink: #eef2ff;
+          --shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Fredoka", ui-rounded, "Segoe UI", system-ui, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .wrap {
+        max-width: 460px;
+        margin: 0 auto;
+        padding: 10px 10px 30px;
+      }
+
+      /* ---------- HUD ---------- */
+      .hud {
+        display: flex;
+        align-items: stretch;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .hud-main {
+        flex: 1 1 auto;
+        display: flex;
+        gap: 8px;
+        min-width: 0;
+      }
+      .stat {
+        flex: 1 1 0;
+        background: var(--panel);
+        border: 2px solid var(--panel-edge);
+        border-radius: 14px;
+        padding: 5px 8px 6px;
+        min-width: 0;
+      }
+      .stat .label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        line-height: 1.1;
+      }
+      .stat .value {
+        display: block;
+        font-size: 22px;
+        font-weight: 700;
+        line-height: 1.15;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .stat .value.small { font-size: 16px; padding-top: 3px; }
+      .lives-row { display: flex; align-items: center; gap: 2px; height: 26px; overflow: hidden; }
+      .life-icon {
+        width: 15px; height: 15px; border-radius: 50%; flex: 0 0 auto;
+        background: #ffd93b;
+        clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+        position: relative;
+      }
+      .life-icon::after {
+        content: ""; position: absolute; inset: 0;
+        background: var(--panel);
+        clip-path: polygon(100% 38%, 46% 50%, 100% 62%);
+      }
+      .hud-btns { display: flex; flex-direction: column; gap: 8px; }
+      .icon-btn {
+        width: 44px; height: 100%; min-height: 34px; flex: 1 1 0;
+        border: 2px solid var(--panel-edge);
+        background: var(--panel);
+        color: var(--ink);
+        border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; padding: 0;
+        touch-action: manipulation;
+      }
+      .icon-btn:active { transform: scale(0.94); }
+      .icon-btn svg { width: 22px; height: 22px; display: block; }
+
+      /* ---------- Board ---------- */
+      .board-wrap {
+        position: relative;
+        width: 100%;
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        background: var(--board-bg);
+        overflow: hidden;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      canvas { display: block; width: 100%; height: auto; }
+      .banner {
+        position: absolute; left: 0; right: 0; top: 44%;
+        text-align: center;
+        font-size: clamp(24px, 7.5vw, 36px);
+        font-weight: 700;
+        color: #ffe45c;
+        text-shadow: 0 3px 0 #8a5a00, 0 6px 18px rgba(0,0,0,0.65);
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(-50%) scale(0.9);
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 3;
+      }
+      .banner.show { opacity: 1; transform: translateY(-50%) scale(1); }
+      .banner .sub {
+        display: block;
+        font-size: clamp(14px, 4.4vw, 19px);
+        color: #ffffff;
+        text-shadow: 0 2px 0 rgba(0,0,0,0.55);
+        margin-top: 2px;
+      }
+      .overlay {
+        position: absolute; inset: 0;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(5, 8, 28, 0.72);
+        padding: 14px;
+        z-index: 4;
+      }
+      .overlay[hidden] { display: none; }
+      .card {
+        background: var(--panel);
+        color: var(--ink);
+        border-radius: 20px;
+        border: 3px solid var(--panel-edge);
+        padding: 20px 20px 18px;
+        width: 100%;
+        max-width: 330px;
+        max-height: 100%;
+        overflow-y: auto;
+        text-align: center;
+        box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+      }
+      .card h2 { margin: 0 0 6px; font-size: 28px; font-weight: 700; line-height: 1.1; }
+      .card p { margin: 0 0 10px; font-size: 15.5px; line-height: 1.45; color: var(--ink); }
+      .card p.dim { color: var(--muted); font-size: 14px; }
+      .card .final-score {
+        font-size: 44px; font-weight: 700; line-height: 1.05;
+        font-variant-numeric: tabular-nums;
+      }
+      .card .final-label {
+        font-size: 12px; font-weight: 600; letter-spacing: 0.1em;
+        text-transform: uppercase; color: var(--muted);
+      }
+      .big-btn {
+        display: block; width: 100%;
+        margin-top: 12px;
+        padding: 15px 18px;
+        font-family: inherit;
+        font-size: 20px; font-weight: 700;
+        color: var(--gold-ink);
+        background: linear-gradient(180deg, #ffd34d, var(--gold) 55%, var(--gold-deep));
+        border: none; border-radius: 16px;
+        box-shadow: 0 5px 0 #b45309, 0 10px 20px rgba(0,0,0,0.25);
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      .big-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #b45309; }
+
+      /* ---------- Controls ---------- */
+      .controls {
+        display: flex; align-items: center; gap: 12px;
+        margin-top: 12px;
+      }
+      .dpad {
+        display: grid;
+        grid-template-columns: repeat(3, 54px);
+        grid-template-rows: repeat(3, 54px);
+        gap: 5px;
+        margin: 0 auto;
+      }
+      .dpad button {
+        border: 2px solid var(--panel-edge);
+        background: var(--btn);
+        color: var(--btn-ink);
+        border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; padding: 0;
+        touch-action: none;
+        box-shadow: 0 3px 0 rgba(10, 16, 44, 0.45);
+      }
+      .dpad button:active, .dpad button.held {
+        transform: translateY(2px);
+        background: var(--gold);
+        color: var(--gold-ink);
+        box-shadow: 0 1px 0 rgba(10, 16, 44, 0.45);
+      }
+      .dpad button svg { width: 24px; height: 24px; display: block; pointer-events: none; }
+      .dpad .spacer { visibility: hidden; }
+      .controls-hint {
+        text-align: center;
+        color: var(--muted);
+        font-size: 13.5px;
+        margin: 10px 4px 0;
+        line-height: 1.45;
+      }
+
+      /* ---------- How to play ---------- */
+      .howto {
+        margin-top: 18px;
+        background: var(--panel);
+        border: 2px solid var(--panel-edge);
+        border-radius: 18px;
+        padding: 16px 18px 8px;
+      }
+      .howto h2 { margin: 0 0 8px; font-size: 21px; font-weight: 700; }
+      .howto p { margin: 0 0 10px; font-size: 15px; line-height: 1.5; }
+      .howto ul { margin: 0 0 10px; padding-left: 20px; }
+      .howto li { font-size: 15px; line-height: 1.5; margin-bottom: 5px; }
+      .grump-list { list-style: none; padding-left: 0; }
+      .grump-list li { display: flex; gap: 9px; align-items: baseline; }
+      .dot-face {
+        flex: 0 0 auto; width: 14px; height: 14px; border-radius: 50%;
+        transform: translateY(2px);
+        box-shadow: inset -2px -3px 0 rgba(0,0,0,0.18);
+      }
+      .kbd {
+        display: inline-block; padding: 0 6px;
+        border: 1.5px solid var(--panel-edge); border-bottom-width: 3px;
+        border-radius: 6px; background: var(--chip);
+        font-weight: 600; font-size: 13px;
+      }
+      strong.gold { color: #b45309; }
+      @media (prefers-color-scheme: dark) { strong.gold { color: var(--gold); } }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <!-- HUD -->
+      <div class="hud">
+        <div class="hud-main">
+          <div class="stat">
+            <span class="label">Score</span>
+            <span class="value" id="scoreVal">0</span>
+          </div>
+          <div class="stat">
+            <span class="label">Best</span>
+            <span class="value" id="bestVal">0</span>
+          </div>
+          <div class="stat">
+            <span class="label">Level</span>
+            <span class="value" id="levelVal">1</span>
+          </div>
+          <div class="stat">
+            <span class="label">Lives</span>
+            <span class="lives-row" id="livesRow"></span>
+          </div>
+        </div>
+        <div class="hud-btns">
+          <button class="icon-btn" id="pauseBtn" type="button" aria-label="Pause or resume game">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1.6"/><rect x="14" y="4" width="5" height="16" rx="1.6"/></svg>
+          </button>
+          <button class="icon-btn" id="muteBtn" type="button" aria-label="Mute or unmute sound">
+            <svg id="soundOnIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.6a4.4 4.4 0 0 1 0 6.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18.7 6a8 8 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <svg id="soundOffIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9.5l6 6M22 9.5l-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Board -->
+      <div class="board-wrap" id="boardWrap">
+        <canvas id="game" width="456" height="528" aria-label="Snack Maze game board"></canvas>
+        <div class="banner" id="banner"></div>
+        <div class="overlay" id="overlay"></div>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls">
+        <div class="dpad" role="group" aria-label="Direction pad">
+          <span class="spacer"></span>
+          <button type="button" data-dir="up" aria-label="Move up"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5l8 10H4z"/></svg></button>
+          <span class="spacer"></span>
+          <button type="button" data-dir="left" aria-label="Move left"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 12l10-8v16z"/></svg></button>
+          <span class="spacer"></span>
+          <button type="button" data-dir="right" aria-label="Move right"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 12L9 4v16z"/></svg></button>
+          <span class="spacer"></span>
+          <button type="button" data-dir="down" aria-label="Move down"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 19L4 9h16z"/></svg></button>
+          <span class="spacer"></span>
+        </div>
+      </div>
+      <p class="controls-hint">Swipe anywhere on the board to steer &mdash; the pad works too. On a keyboard, use the arrow keys or <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span></p>
+
+      <!-- How to play -->
+      <section class="howto">
+        <h2>How to play</h2>
+        <p>Guide the little yellow muncher through the maze and eat <strong>every snack dot</strong> to clear the level. Eat all the dots, dodge the Grumps, and chase the bonuses.</p>
+        <ul>
+          <li><strong>Power apples</strong> (one glowing in each corner) turn every Grump dark blue and scared for about 7 seconds. Gobble a fleeing Grump for <strong>200</strong>, then <strong>400</strong>, <strong>800</strong>, and <strong>1600</strong> points in a chain.</li>
+          <li>A <strong class="gold">golden peach</strong> worth <strong>500 points</strong> appears under the Grump pen partway through each level &mdash; grab it before it vanishes.</li>
+          <li>Touching a Grump in its normal colors costs a life. You have <strong>3 lives</strong>; each new level refills the dots and everything moves a little faster.</li>
+        </ul>
+        <p style="margin-bottom:4px"><strong>Meet the Grumps:</strong></p>
+        <ul class="grump-list">
+          <li><span class="dot-face" style="background:#ff5252"></span><span><strong>Blitz</strong> (red) &mdash; charges straight at you.</span></li>
+          <li><span class="dot-face" style="background:#26c6da"></span><span><strong>Sneak</strong> (teal) &mdash; sneaky: aims for the spot just ahead of you.</span></li>
+          <li><span class="dot-face" style="background:#66bb6a"></span><span><strong>Wander</strong> (green) &mdash; roams the maze wherever it pleases.</span></li>
+          <li><span class="dot-face" style="background:#f48fb1"></span><span><strong>Shy</strong> (pink) &mdash; comes after you, but loses its nerve and backs off when it gets close.</span></li>
+        </ul>
+      </section>
+    </main>
+
+    <script>
+    "use strict";
+    /* ================= Snack Maze =================
+       Original maze-chase game. All art drawn on canvas, all
+       sounds synthesized with WebAudio. No assets, no libraries. */
+
+    var COLS = 19, ROWS = 22, TILE = 24;
+    var MAP = [
+      "###################",
+      "#........#........#",
+      "#o##.###.#.###.##o#",
+      "#.................#",
+      "#.##.#.#####.#.##.#",
+      "#....#...#...#....#",
+      "####.###.#.###.####",
+      "####.#.......#.####",
+      "####.#.##-##.#.####",
+      "#......#GGG#......#",
+      "#......#GGG#......#",
+      "####.#.#####.#.####",
+      "####.#.......#.####",
+      "####.#.#####.#.####",
+      "#........#........#",
+      "#.##.###.#.###.##.#",
+      "#o.#.....P.....#.o#",
+      "##.#.#.#####.#.#.##",
+      "#....#...#...#....#",
+      "#.######.#.######.#",
+      "#.................#",
+      "###################"
+    ];
+    var DOOR = { x: 9, y: 8 };          // pen door tile
+    var EXIT = { x: 9, y: 7 };          // tile just above the door
+    var PEN_Y = 9.5;                    // grump row inside the pen
+    var PLAYER_START = { x: 9, y: 16 };
+    var PEACH_TILE = { x: 9, y: 12 };   // under the pen
+    var PEACH_AT_DOTS = 70;             // dots eaten before peach appears
+    var PEACH_POINTS = 500;
+
+    var DIRS = {
+      up:    { x: 0, y: -1, angle: -Math.PI / 2 },
+      left:  { x: -1, y: 0, angle: Math.PI },
+      down:  { x: 0, y: 1, angle: Math.PI / 2 },
+      right: { x: 1, y: 0, angle: 0 }
+    };
+    var DIR_LIST = [DIRS.up, DIRS.left, DIRS.down, DIRS.right];
+    function opposite(d) {
+      for (var i = 0; i < DIR_LIST.length; i++) {
+        if (DIR_LIST[i].x === -d.x && DIR_LIST[i].y === -d.y) return DIR_LIST[i];
+      }
+      return null;
+    }
+    function tileAt(x, y) {
+      if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return "#";
+      return MAP[y].charAt(x);
+    }
+    function isWall(x, y) {
+      var c = tileAt(x, y);
+      return c === "#" || c === "-" || c === "G";
+    }
+
+    /* ---------------- Game state ---------------- */
+    var canvas = document.getElementById("game");
+    var ctx = canvas.getContext("2d");
+    var DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = COLS * TILE * DPR;
+    canvas.height = ROWS * TILE * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    var state = "menu"; // menu | intro | playing | dying | levelclear | gameover | paused
+    var pausedFrom = null;
+    var score = 0, best = 0, lives = 3, level = 1;
+    var dots = {};        // "x,y" -> "dot" | "power"
+    var totalDots = 0, dotsEaten = 0;
+    var frightTime = 0, frightDur = 7, chain = 0;
+    var levelTime = 0, stateTime = 0, freezeTime = 0;
+    var peach = null;     // { active, timeLeft, spawned }
+    var popups = [];      // floating score texts
+    var animTime = 0;
+    var deathT = 0;
+    var lastTs = 0;
+
+    var player = null;
+    var grumps = [];
+
+    var GRUMP_DEFS = [
+      { name: "Blitz",  color: "#ff5252", dark: "#c62828", kind: "chase",  corner: { x: 17, y: 1 },  penX: 9,  release: 0 },
+      { name: "Sneak",  color: "#26c6da", dark: "#00838f", kind: "ahead",  corner: { x: 1, y: 1 },   penX: 8,  release: 2.2 },
+      { name: "Wander", color: "#66bb6a", dark: "#2e7d32", kind: "wander", corner: { x: 17, y: 20 }, penX: 10, release: 4.6 },
+      { name: "Shy",    color: "#f48fb1", dark: "#ad1457", kind: "shy",    corner: { x: 1, y: 20 },  penX: 9,  release: 7.2 }
+    ];
+
+    function resetDots() {
+      dots = {}; totalDots = 0; dotsEaten = 0;
+      for (var y = 0; y < ROWS; y++) {
+        for (var x = 0; x < COLS; x++) {
+          var c = MAP[y].charAt(x);
+          if (c === ".") { dots[x + "," + y] = "dot"; totalDots++; }
+          else if (c === "o") { dots[x + "," + y] = "power"; totalDots++; }
+        }
+      }
+    }
+
+    function makePlayer() {
+      return {
+        x: PLAYER_START.x, y: PLAYER_START.y,
+        dir: null, desired: null,
+        speed: 7.8
+      };
+    }
+    function makeGrumps(respawn) {
+      var list = [];
+      for (var i = 0; i < GRUMP_DEFS.length; i++) {
+        var def = GRUMP_DEFS[i];
+        var g = {
+          def: def, kind: def.kind,
+          x: def.penX, y: PEN_Y,
+          dir: DIRS.left, speed: 7.1,
+          state: "pen",                       // pen | leave | active | eyes | enter
+          releaseAt: respawn ? def.release * 0.55 : def.release,
+          waypoints: [], wait: 0,
+          wanderTarget: null, wanderTimer: 0,
+          phase: i * 1.7
+        };
+        list.push(g);
+      }
+      return list;
+    }
+
+    function speedScale() { return Math.min(1.5, 1 + (level - 1) * 0.055); }
+    function frightDuration() { return Math.max(3.5, 7 - (level - 1) * 0.35); }
+
+    function resetPositions(respawn) {
+      player = makePlayer();
+      grumps = makeGrumps(respawn);
+      frightTime = 0; chain = 0; freezeTime = 0;
+      popups = [];
+      if (peach) { peach.active = false; peach.timeLeft = 0; }
+    }
+
+    function startLevel(introText) {
+      resetDots();
+      peach = { active: false, timeLeft: 0, spawned: false };
+      resetPositions(false);
+      levelTime = 0;
+      frightDur = frightDuration();
+      setState("intro");
+      showBanner(introText || ("Level " + level), "Ready!");
+      playJingleStart();
+      updateHUD();
+    }
+
+    function newGame() {
+      score = 0; lives = 3; level = 1;
+      hideOverlay();
+      startLevel("Level 1");
+    }
+
+    function setState(s) { state = s; stateTime = 0; }
+
+    /* ---------------- Audio (WebAudio) ---------------- */
+    var AC = null, muted = false, chompFlip = false, nextWobbleAt = 0;
+    function audio() {
+      if (!AC) {
+        var Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return null;
+        AC = new Ctor();
+      }
+      if (AC.state === "suspended") AC.resume();
+      return AC;
+    }
+    function tone(freq, dur, type, vol, delay, slideTo) {
+      if (muted) return;
+      var a = audio(); if (!a) return;
+      var t0 = a.currentTime + (delay || 0);
+      var o = a.createOscillator(), g = a.createGain();
+      o.type = type || "square";
+      o.frequency.setValueAtTime(freq, t0);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(30, slideTo), t0 + dur);
+      g.gain.setValueAtTime(vol || 0.12, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      o.connect(g); g.connect(a.destination);
+      o.start(t0); o.stop(t0 + dur + 0.03);
+    }
+    function sndChomp() { chompFlip = !chompFlip; tone(chompFlip ? 540 : 390, 0.055, "triangle", 0.13); }
+    function sndPower() { tone(240, 0.16, "square", 0.12, 0, 660); tone(660, 0.12, "square", 0.08, 0.1, 880); }
+    function sndGrumpEaten() { tone(180, 0.28, "square", 0.14, 0, 980); tone(1200, 0.1, "triangle", 0.1, 0.2); }
+    function sndPeach() { tone(880, 0.12, "sine", 0.16); tone(1318, 0.22, "sine", 0.16, 0.09); }
+    function sndDeath() { tone(620, 0.95, "sawtooth", 0.11, 0, 55); tone(310, 0.95, "triangle", 0.09, 0.05, 40); }
+    function sndLevelClear() {
+      var notes = [523, 659, 784, 1046];
+      for (var i = 0; i < notes.length; i++) tone(notes[i], 0.16, "square", 0.11, i * 0.1);
+    }
+    function sndGameOver() {
+      var notes = [392, 330, 262, 196];
+      for (var i = 0; i < notes.length; i++) tone(notes[i], 0.24, "triangle", 0.13, i * 0.16);
+    }
+    function playJingleStart() { tone(523, 0.1, "square", 0.09); tone(784, 0.14, "square", 0.09, 0.09); }
+    function sndWobble() { tone(150, 0.22, "sine", 0.075, 0, 320); }
+</script>
+
+    <script>
+    "use strict";
+    /* ---------------- Movement engine ----------------
+       Entities glide continuously. Decisions happen only when an
+       entity snaps exactly onto a tile center. */
+    function stepEntity(e, dt, decide) {
+      var distLeft = e.speed * dt;
+      var guard = 0;
+      while (distLeft > 1e-9 && guard++ < 10) {
+        var cx = Math.round(e.x), cy = Math.round(e.y);
+        var atCenter = Math.abs(e.x - cx) < 1e-9 && Math.abs(e.y - cy) < 1e-9;
+        if (atCenter) {
+          var nd = decide(e, cx, cy);
+          if (nd) e.dir = nd;
+          if (!e.dir) return;
+          if (isWall(cx + e.dir.x, cy + e.dir.y)) { e.dir = e.dir; return; }
+        }
+        if (!e.dir) return;
+        // distance to the next tile center along the direction of travel
+        var dNext;
+        if (e.dir.x > 0) dNext = (Math.floor(e.x + 1e-9) + 1) - e.x;
+        else if (e.dir.x < 0) dNext = e.x - (Math.ceil(e.x - 1e-9) - 1);
+        else if (e.dir.y > 0) dNext = (Math.floor(e.y + 1e-9) + 1) - e.y;
+        else dNext = e.y - (Math.ceil(e.y - 1e-9) - 1);
+        if (dNext < 1e-9) dNext = 1; // exactly on a center, heading onward
+        var step = Math.min(distLeft, dNext);
+        e.x += e.dir.x * step;
+        e.y += e.dir.y * step;
+        distLeft -= step;
+        if (step >= dNext - 1e-12) {
+          // snap exactly onto the center we just reached
+          e.x = Math.round(e.x); e.y = Math.round(e.y);
+        }
+      }
+    }
+
+    function playerDecide(e, cx, cy) {
+      if (e.desired && !isWall(cx + e.desired.x, cy + e.desired.y)) return e.desired;
+      if (e.dir && !isWall(cx + e.dir.x, cy + e.dir.y)) return e.dir;
+      return null; // stop at this center
+    }
+
+    function grumpTarget(g) {
+      var pt = { x: Math.round(player.x), y: Math.round(player.y) };
+      if (g.state === "eyes") return EXIT;
+      switch (g.kind) {
+        case "chase": return pt;
+        case "ahead":
+          if (player.dir) return { x: pt.x + player.dir.x * 4, y: pt.y + player.dir.y * 4 };
+          return pt;
+        case "wander":
+          if (!g.wanderTarget) g.wanderTarget = g.def.corner;
+          return g.wanderTarget;
+        case "shy": {
+          var dx = g.x - player.x, dy = g.y - player.y;
+          if (Math.sqrt(dx * dx + dy * dy) <= 8) return g.def.corner;
+          return pt;
+        }
+      }
+      return pt;
+    }
+
+    function grumpDecide(g, cx, cy) {
+      if (g.state === "eyes" && cx === EXIT.x && cy === EXIT.y) {
+        // arrived above the pen door: dive back inside
+        g.state = "enter";
+        g.waypoints = [{ x: DOOR.x, y: PEN_Y }];
+        g.dir = DIRS.down;
+        return null;
+      }
+      var options = [];
+      for (var i = 0; i < DIR_LIST.length; i++) {
+        var d = DIR_LIST[i];
+        if (g.dir && d === opposite(g.dir)) continue;   // no U-turns
+        if (!isWall(cx + d.x, cy + d.y)) options.push(d);
+      }
+      if (options.length === 0) return g.dir ? opposite(g.dir) : null;
+      if (frightTime > 0 && g.state === "active") {
+        return options[Math.floor(Math.random() * options.length)];
+      }
+      var t = grumpTarget(g);
+      var bestDir = options[0], bestDist = Infinity;
+      for (var j = 0; j < options.length; j++) {
+        var nx = cx + options[j].x - t.x, ny = cy + options[j].y - t.y;
+        var dist = nx * nx + ny * ny;
+        if (dist < bestDist) { bestDist = dist; bestDir = options[j]; }
+      }
+      return bestDir;
+    }
+
+    function moveWaypoints(e, dt, speed) {
+      var wp = e.waypoints[0];
+      if (!wp) return true;
+      var dx = wp.x - e.x, dy = wp.y - e.y;
+      var step = speed * dt;
+      if (Math.abs(dx) > 1e-9) {
+        e.dir = dx > 0 ? DIRS.right : DIRS.left;
+        var mx = Math.min(step, Math.abs(dx));
+        e.x += dx > 0 ? mx : -mx; step -= mx;
+        if (Math.abs(e.x - wp.x) < 1e-9) e.x = wp.x;
+      }
+      if (step > 0 && Math.abs(dy) > 1e-9) {
+        e.dir = dy > 0 ? DIRS.down : DIRS.up;
+        var my = Math.min(step, Math.abs(dy));
+        e.y += dy > 0 ? my : -my;
+        if (Math.abs(e.y - wp.y) < 1e-9) e.y = wp.y;
+      }
+      if (Math.abs(e.x - wp.x) < 1e-9 && Math.abs(e.y - wp.y) < 1e-9) {
+        e.waypoints.shift();
+        return e.waypoints.length === 0;
+      }
+      return false;
+    }
+
+    function reverseGrumps() {
+      for (var i = 0; i < grumps.length; i++) {
+        var g = grumps[i];
+        if (g.state === "active" && g.dir) g.dir = opposite(g.dir);
+      }
+    }
+
+    function setFright(on) {
+      if (on) { frightTime = frightDur; chain = 0; reverseGrumps(); }
+      else { frightTime = 0; }
+    }
+
+    /* ---------------- Update ---------------- */
+    function update(dt) {
+      animTime += dt;
+      stateTime += dt;
+      var i, g;
+
+      // popups always float
+      for (i = popups.length - 1; i >= 0; i--) {
+        popups[i].t += dt; popups[i].y -= dt * 0.7;
+        if (popups[i].t > 0.9) popups.splice(i, 1);
+      }
+
+      if (state === "intro") {
+        if (stateTime > 1.05) { setState("playing"); hideBanner(); }
+        return;
+      }
+      if (state === "levelclear") {
+        if (stateTime > 1.7) {
+          level++;
+          hideOverlay();
+          startLevel("Level " + level);
+        }
+        return;
+      }
+      if (state === "dying") return; // death anim handled by stateTime in render + timer below
+      if (state !== "playing") return;
+
+      if (freezeTime > 0) { freezeTime -= dt; return; }
+      levelTime += dt;
+
+      // power-mode timer + wobble sound
+      if (frightTime > 0) {
+        frightTime -= dt;
+        if (animTime >= nextWobbleAt) { sndWobble(); nextWobbleAt = animTime + 0.26; }
+        if (frightTime <= 0) { frightTime = 0; chain = 0; }
+      }
+
+      // peach lifetime
+      if (peach && peach.active) {
+        peach.timeLeft -= dt;
+        if (peach.timeLeft <= 0) peach.active = false;
+      }
+
+      // --- player ---
+      var pScale = speedScale();
+      player.speed = 7.8 * pScale;
+      stepEntity(player, dt, playerDecide);
+      eatAtPlayerTile();
+      if (state !== "playing") return; // level just cleared mid-frame
+
+      // --- grumps ---
+      for (i = 0; i < grumps.length; i++) {
+        g = grumps[i];
+        if (g.kind === "wander") {
+          g.wanderTimer -= dt;
+          if (g.wanderTimer <= 0) {
+            g.wanderTimer = 3 + Math.random() * 2.5;
+            var wx, wy, tries = 0;
+            do { wx = 1 + Math.floor(Math.random() * (COLS - 2)); wy = 1 + Math.floor(Math.random() * (ROWS - 2)); tries++; }
+            while (isWall(wx, wy) && tries < 20);
+            if (!isWall(wx, wy)) g.wanderTarget = { x: wx, y: wy };
+          }
+        }
+        switch (g.state) {
+          case "pen":
+            if (levelTime >= g.releaseAt) {
+              g.state = "leave";
+              g.waypoints = [{ x: DOOR.x, y: PEN_Y }, { x: EXIT.x, y: EXIT.y }];
+            }
+            break;
+          case "leave":
+            g.speed = 5.2 * pScale;
+            if (moveWaypoints(g, dt, g.speed)) {
+              g.state = "active";
+              g.dir = Math.random() < 0.5 ? DIRS.left : DIRS.right;
+              g.x = EXIT.x; g.y = EXIT.y;
+            }
+            break;
+          case "enter":
+            g.speed = 9 * pScale;
+            if (moveWaypoints(g, dt, g.speed)) {
+              g.state = "pen";
+              g.releaseAt = levelTime + 0.7;
+              g.x = g.def.penX; g.y = PEN_Y;
+              g.waypoints = [];
+            }
+            break;
+          case "eyes":
+            g.speed = 13 * pScale;
+            stepEntity(g, dt, grumpDecide);
+            break;
+          case "active":
+            g.speed = (frightTime > 0 ? 4.7 : 7.1) * pScale;
+            stepEntity(g, dt, grumpDecide);
+            break;
+        }
+      }
+
+      checkCollisions();
+    }
+
+    function eatAtPlayerTile() {
+      var cx = Math.round(player.x), cy = Math.round(player.y);
+      if (Math.abs(player.x - cx) > 0.45 || Math.abs(player.y - cy) > 0.45) return;
+      var key = cx + "," + cy;
+      var kind = dots[key];
+      if (kind) {
+        delete dots[key];
+        dotsEaten++;
+        if (kind === "dot") { addScore(10); sndChomp(); }
+        else { addScore(50); sndPower(); setFright(true); }
+        if (peach && !peach.spawned && dotsEaten >= PEACH_AT_DOTS) {
+          peach.spawned = true; peach.active = true; peach.timeLeft = 9.5;
+        }
+        if (dotsEaten >= totalDots) {
+          sndLevelClear();
+          setState("levelclear");
+          showBanner("Level " + level + " cleared!", "Nice munching!");
+        }
+        updateHUD();
+        return;
+      }
+      if (peach && peach.active && cx === PEACH_TILE.x && cy === PEACH_TILE.y) {
+        peach.active = false;
+        addScore(PEACH_POINTS);
+        popups.push({ x: cx, y: cy, text: "+" + PEACH_POINTS, t: 0 });
+        sndPeach();
+        updateHUD();
+      }
+    }
+
+    function checkCollisions() {
+      for (var i = 0; i < grumps.length; i++) {
+        var g = grumps[i];
+        if (g.state !== "active") continue;
+        var dx = g.x - player.x, dy = g.y - player.y;
+        if (dx * dx + dy * dy < 0.32) { // ~0.57 tiles apart
+          if (frightTime > 0) {
+            var pts = [200, 400, 800, 1600][Math.min(chain, 3)];
+            chain++;
+            addScore(pts);
+            popups.push({ x: g.x, y: g.y, text: "" + pts, t: 0 });
+            g.state = "eyes";
+            freezeTime = 0.35;
+            sndGrumpEaten();
+            updateHUD();
+          } else {
+            startDeath();
+            return;
+          }
+        }
+      }
+    }
+
+    function startDeath() {
+      lives--;
+      updateHUD();
+      sndDeath();
+      setState("dying");
+      deathT = 0;
+    }
+
+    function afterDeath() {
+      if (lives <= 0) {
+        setState("gameover");
+        if (score > best) best = score;
+        updateHUD();
+        sndGameOver();
+        showGameOver();
+      } else {
+        resetPositions(true);
+        levelTime = 0;
+        setState("intro");
+        showBanner("Ready!", "Lives left: " + lives);
+      }
+    }
+
+    function addScore(n) {
+      score += n;
+      if (score > best) best = score;
+    }
+</script>
+
+    <script>
+    "use strict";
+    /* ---------------- Rendering ---------------- */
+    function rr(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    function drawBoard() {
+      ctx.fillStyle = "#0a0f2e";
+      ctx.fillRect(0, 0, COLS * TILE, ROWS * TILE);
+      var x, y;
+      // snack dots (drawn under walls pass order irrelevant — dots sit on paths)
+      for (var key in dots) {
+        var parts = key.split(",");
+        x = +parts[0]; y = +parts[1];
+        var cxp = (x + 0.5) * TILE, cyp = (y + 0.5) * TILE;
+        if (dots[key] === "dot") {
+          ctx.fillStyle = "#ffe9c4";
+          ctx.beginPath(); ctx.arc(cxp, cyp, TILE * 0.11, 0, Math.PI * 2); ctx.fill();
+        } else {
+          drawApple(cxp, cyp, TILE * 0.34 * (1 + 0.1 * Math.sin(animTime * 5)));
+        }
+      }
+      // pen door
+      ctx.fillStyle = "#f7a8c4";
+      rr(DOOR.x * TILE + 2, DOOR.y * TILE + TILE * 0.4, TILE - 4, TILE * 0.2, 3);
+      ctx.fill();
+      // walls
+      for (y = 0; y < ROWS; y++) {
+        for (x = 0; x < COLS; x++) {
+          if (MAP[y].charAt(x) !== "#") continue;
+          var px = x * TILE, py = y * TILE;
+          var grad = ctx.createLinearGradient(px, py, px, py + TILE);
+          grad.addColorStop(0, "#3d5bf0");
+          grad.addColorStop(1, "#1b2a7d");
+          ctx.fillStyle = grad;
+          rr(px + 1.2, py + 1.2, TILE - 2.4, TILE - 2.4, TILE * 0.3);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(140,175,255,0.5)";
+          ctx.lineWidth = 1.4;
+          rr(px + TILE * 0.24, py + TILE * 0.24, TILE * 0.52, TILE * 0.52, TILE * 0.18);
+          ctx.stroke();
+        }
+      }
+      // peach bonus
+      if (peach && peach.active) {
+        if (!(peach.timeLeft < 2 && Math.floor(animTime * 6) % 2 === 0)) {
+          drawPeach((PEACH_TILE.x + 0.5) * TILE, (PEACH_TILE.y + 0.5) * TILE, TILE * 0.36);
+        }
+      }
+    }
+
+    function drawApple(cx, cy, r) {
+      ctx.save();
+      ctx.shadowColor = "rgba(255,70,70,0.85)";
+      ctx.shadowBlur = 14;
+      var grad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.2, cx, cy, r);
+      grad.addColorStop(0, "#ff8a75");
+      grad.addColorStop(1, "#e5231b");
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(cx, cy + r * 0.08, r, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      // stem
+      ctx.strokeStyle = "#7a4a21";
+      ctx.lineWidth = Math.max(2, r * 0.16);
+      ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(cx, cy - r * 0.75); ctx.quadraticCurveTo(cx + r * 0.1, cy - r * 1.05, cx + r * 0.3, cy - r * 1.1); ctx.stroke();
+      // leaf
+      ctx.fillStyle = "#43a047";
+      ctx.beginPath();
+      ctx.ellipse(cx + r * 0.48, cy - r * 0.82, r * 0.34, r * 0.16, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+      // shine
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.beginPath(); ctx.ellipse(cx - r * 0.36, cy - r * 0.3, r * 0.2, r * 0.32, 0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    function drawPeach(cx, cy, r) {
+      ctx.save();
+      ctx.shadowColor = "rgba(255,190,40,0.9)";
+      ctx.shadowBlur = 16;
+      var grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.2, cx, cy, r);
+      grad.addColorStop(0, "#ffe082");
+      grad.addColorStop(0.6, "#ffb300");
+      grad.addColorStop(1, "#fb8c00");
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "rgba(190,110,0,0.65)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy - r * 0.15, r * 0.78, Math.PI * 0.35, Math.PI * 0.75); ctx.stroke();
+      ctx.fillStyle = "#43a047";
+      ctx.beginPath(); ctx.ellipse(cx + r * 0.3, cy - r * 0.95, r * 0.32, r * 0.15, -0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.beginPath(); ctx.ellipse(cx - r * 0.34, cy - r * 0.34, r * 0.18, r * 0.28, 0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    function drawMuncher() {
+      if (state === "gameover") return;
+      var cx = (player.x + 0.5) * TILE, cy = (player.y + 0.5) * TILE;
+      var r = TILE * 0.44;
+      var angle = player.dir ? player.dir.angle : 0;
+      var wedge;
+      if (state === "dying") {
+        // mouth opens wider and wider, then the muncher shrinks away
+        var t = Math.min(1, stateTime / 1.05);
+        wedge = 0.25 + t * 0.75;
+        angle = -Math.PI / 2;
+        r = r * (t > 0.75 ? Math.max(0, 1 - (t - 0.75) * 4) : 1);
+        if (r <= 0.2) return;
+      } else {
+        var moving = player.dir && (state === "playing");
+        var chomp = moving ? Math.abs(Math.sin(animTime * 11)) : 0.35;
+        wedge = 0.06 + chomp * 0.26;
+      }
+      var a = wedge * Math.PI;
+      ctx.fillStyle = "#ffd93b";
+      ctx.strokeStyle = "#e0a800";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, angle + a, angle + Math.PI * 2 - a);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      // eye (skip while dying — it is busy disappearing)
+      if (state !== "dying") {
+        var ex = cx + Math.cos(angle - Math.PI / 2) * r * 0.42 - Math.cos(angle) * r * 0.05;
+        var ey = cy + Math.sin(angle - Math.PI / 2) * r * 0.42 - Math.sin(angle) * r * 0.05;
+        ctx.fillStyle = "#263238";
+        ctx.beginPath(); ctx.arc(ex, ey, r * 0.14, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    function drawGrump(g) {
+      var bob = g.state === "pen" ? Math.sin(animTime * 3.2 + g.phase) * TILE * 0.07 : 0;
+      var cx = (g.x + 0.5) * TILE, cy = (g.y + 0.5) * TILE + bob;
+      var r = TILE * 0.44;
+      var eyesOnly = g.state === "eyes" || g.state === "enter";
+      var frightened = !eyesOnly && frightTime > 0 && (g.state === "active");
+      var flash = frightened && frightTime < 2 && Math.floor(animTime * 5) % 2 === 0;
+
+      if (!eyesOnly) {
+        var body = frightened ? (flash ? "#f5f5f5" : "#27349e") : g.def.color;
+        // feet
+        ctx.fillStyle = frightened ? "#1b2370" : g.def.dark;
+        ctx.beginPath(); ctx.arc(cx - r * 0.48, cy + r * 0.78, r * 0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + r * 0.48, cy + r * 0.78, r * 0.3, 0, Math.PI * 2); ctx.fill();
+        // round body
+        ctx.fillStyle = body;
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "rgba(0,0,0,0.22)";
+        ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.arc(cx, cy, r - 0.7, 0, Math.PI * 2); ctx.stroke();
+      }
+
+      var look = g.dir || DIRS.left;
+      var lx = look.x * r * 0.14, ly = look.y * r * 0.14;
+      if (frightened) {
+        // cream scared face: dot eyes + zigzag mouth
+        ctx.fillStyle = "#ffe9c4";
+        ctx.beginPath(); ctx.arc(cx - r * 0.34 + lx, cy - r * 0.18 + ly, r * 0.11, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + r * 0.34 + lx, cy - r * 0.18 + ly, r * 0.11, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#ffe9c4";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        var mw = r * 0.62, my = cy + r * 0.38, seg = mw / 3;
+        ctx.moveTo(cx - mw / 2, my);
+        for (var s = 0; s < 3; s++) {
+          ctx.lineTo(cx - mw / 2 + seg * (s + 0.5), my - r * 0.16);
+          ctx.lineTo(cx - mw / 2 + seg * (s + 1), my);
+        }
+        ctx.stroke();
+      } else {
+        // two big eyes with pupils that look where they are heading
+        var exOff = r * 0.36, eyOff = -r * 0.22;
+        var exs = [cx - exOff, cx + exOff];
+        for (var i = 0; i < 2; i++) {
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath(); ctx.ellipse(exs[i], cy + eyOff, r * 0.21, r * 0.27, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#20304a";
+          ctx.beginPath(); ctx.arc(exs[i] + lx, cy + eyOff + ly, r * 0.115, 0, Math.PI * 2); ctx.fill();
+        }
+        if (!eyesOnly) {
+          // little smile
+          ctx.strokeStyle = "rgba(0,0,0,0.45)";
+          ctx.lineWidth = 1.8;
+          ctx.beginPath(); ctx.arc(cx, cy + r * 0.28, r * 0.3, Math.PI * 0.2, Math.PI * 0.8); ctx.stroke();
+        }
+      }
+    }
+
+    function drawPopups() {
+      ctx.textAlign = "center";
+      ctx.font = "700 13px Fredoka, sans-serif";
+      for (var i = 0; i < popups.length; i++) {
+        var p = popups[i];
+        ctx.globalAlpha = Math.max(0, 1 - p.t / 0.9);
+        ctx.fillStyle = "#7be495";
+        ctx.fillText(p.text, (p.x + 0.5) * TILE, (p.y + 0.4) * TILE);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function render() {
+      drawBoard();
+      for (var i = 0; i < grumps.length; i++) drawGrump(grumps[i]);
+      if (player) drawMuncher();
+      drawPopups();
+    }
+</script>
+
+    <script>
+    "use strict";
+    /* ---------------- HUD & overlays ---------------- */
+    var scoreVal = document.getElementById("scoreVal");
+    var bestVal = document.getElementById("bestVal");
+    var levelVal = document.getElementById("levelVal");
+    var livesRow = document.getElementById("livesRow");
+    var overlay = document.getElementById("overlay");
+    var banner = document.getElementById("banner");
+
+    function updateHUD() {
+      scoreVal.textContent = score;
+      bestVal.textContent = best;
+      levelVal.textContent = level;
+      var html = "";
+      for (var i = 0; i < lives; i++) html += '<span class="life-icon"></span>';
+      livesRow.innerHTML = html || '<span style="font-size:13px;color:var(--muted)">—</span>';
+    }
+    function showBanner(main, sub) {
+      banner.innerHTML = main + (sub ? '<span class="sub">' + sub + "</span>" : "");
+      banner.classList.add("show");
+    }
+    function hideBanner() { banner.classList.remove("show"); }
+
+    function showStartCard() {
+      overlay.hidden = false;
+      overlay.innerHTML =
+        '<div class="card">' +
+        "<h2>Ready to snack?</h2>" +
+        "<p>Eat every dot in the maze to clear the level — but watch out for the four Grumps patrolling the halls.</p>" +
+        '<p class="dim">Swipe the board or use the pad to steer. Power apples turn the tables for about 7 seconds.</p>' +
+        '<button class="big-btn" id="startBtn" type="button">Start snacking</button>' +
+        "</div>";
+      document.getElementById("startBtn").addEventListener("click", function () {
+        audio();
+        newGame();
+      });
+    }
+    function showGameOver() {
+      overlay.hidden = false;
+      overlay.innerHTML =
+        '<div class="card">' +
+        "<h2>Game over</h2>" +
+        '<div class="final-label">Final score</div>' +
+        '<div class="final-score">' + score + "</div>" +
+        "<p>You reached <strong>level " + level + "</strong>" +
+        (score >= best && score > 0 ? " — a new session best!" : " · Best: " + best) + "</p>" +
+        '<button class="big-btn" id="againBtn" type="button">Play again</button>' +
+        "</div>";
+      document.getElementById("againBtn").addEventListener("click", function () {
+        audio();
+        newGame();
+      });
+    }
+    function showPaused() {
+      overlay.hidden = false;
+      overlay.innerHTML =
+        '<div class="card">' +
+        "<h2>Paused</h2>" +
+        "<p>Take a breather — the snacks aren't going anywhere.</p>" +
+        '<button class="big-btn" id="resumeBtn" type="button">Keep playing</button>' +
+        "</div>";
+      document.getElementById("resumeBtn").addEventListener("click", togglePause);
+    }
+    function hideOverlay() { overlay.hidden = true; overlay.innerHTML = ""; }
+
+    /* ---------------- Input ---------------- */
+    function setDesired(d) {
+      if (!player) return;
+      if (state === "menu") return;
+      player.desired = d;
+      // instant U-turn, like the arcade original
+      if (player.dir && d === opposite(player.dir)) player.dir = d;
+    }
+
+    // swipe on the board
+    var boardWrap = document.getElementById("boardWrap");
+    var touchStart = null;
+    boardWrap.addEventListener("touchstart", function (ev) {
+      var t = ev.changedTouches[0];
+      touchStart = { x: t.clientX, y: t.clientY };
+    }, { passive: true });
+    boardWrap.addEventListener("touchmove", function (ev) {
+      if (!touchStart) return;
+      var t = ev.changedTouches[0];
+      var dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+      if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+      if (Math.abs(dx) > Math.abs(dy)) setDesired(dx > 0 ? DIRS.right : DIRS.left);
+      else setDesired(dy > 0 ? DIRS.down : DIRS.up);
+      touchStart = { x: t.clientX, y: t.clientY };
+      ev.preventDefault();
+    }, { passive: false });
+    boardWrap.addEventListener("touchend", function (ev) {
+      if (!touchStart) return;
+      var t = ev.changedTouches[0];
+      var dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+      if (Math.abs(dx) >= 18 || Math.abs(dy) >= 18) {
+        if (Math.abs(dx) > Math.abs(dy)) setDesired(dx > 0 ? DIRS.right : DIRS.left);
+        else setDesired(dy > 0 ? DIRS.down : DIRS.up);
+      }
+      touchStart = null;
+    }, { passive: true });
+
+    // D-pad (press-and-hold friendly: direction queues on press)
+    var dpadBtns = document.querySelectorAll(".dpad button[data-dir]");
+    dpadBtns.forEach(function (btn) {
+      var d = DIRS[btn.getAttribute("data-dir")];
+      var press = function (ev) {
+        ev.preventDefault();
+        audio();
+        setDesired(d);
+        btn.classList.add("held");
+      };
+      btn.addEventListener("pointerdown", press);
+      btn.addEventListener("pointerup", function () { btn.classList.remove("held"); });
+      btn.addEventListener("pointerleave", function () { btn.classList.remove("held"); });
+      btn.addEventListener("pointercancel", function () { btn.classList.remove("held"); });
+    });
+
+    // keyboard
+    var KEYMAP = {
+      ArrowUp: DIRS.up, ArrowDown: DIRS.down, ArrowLeft: DIRS.left, ArrowRight: DIRS.right,
+      w: DIRS.up, s: DIRS.down, a: DIRS.left, d: DIRS.right,
+      W: DIRS.up, S: DIRS.down, A: DIRS.left, D: DIRS.right
+    };
+    document.addEventListener("keydown", function (ev) {
+      var d = KEYMAP[ev.key];
+      if (d) { ev.preventDefault(); audio(); setDesired(d); return; }
+      if (ev.key === " " || ev.key === "Enter") {
+        if (state === "menu") { ev.preventDefault(); audio(); newGame(); }
+        else if (state === "gameover") { ev.preventDefault(); audio(); newGame(); }
+      }
+      if (ev.key === "p" || ev.key === "P") togglePause();
+      if (ev.key === "m" || ev.key === "M") toggleMute();
+    });
+
+    // pause & mute buttons
+    function togglePause() {
+      if (state === "playing" || state === "intro") {
+        pausedFrom = state;
+        setState("paused");
+        showPaused();
+      } else if (state === "paused") {
+        setState(pausedFrom || "playing");
+        pausedFrom = null;
+        hideOverlay();
+        if (state === "playing") hideBanner();
+      }
+    }
+    document.getElementById("pauseBtn").addEventListener("click", function () { audio(); togglePause(); });
+
+    var soundOnIcon = document.getElementById("soundOnIcon");
+    var soundOffIcon = document.getElementById("soundOffIcon");
+    function toggleMute() {
+      muted = !muted;
+      soundOnIcon.style.display = muted ? "none" : "block";
+      soundOffIcon.style.display = muted ? "block" : "none";
+    }
+    document.getElementById("muteBtn").addEventListener("click", toggleMute);
+
+    /* ---------------- Main loop ---------------- */
+    function frame(ts) {
+      requestAnimationFrame(frame);
+      if (!lastTs) lastTs = ts;
+      var dt = Math.min(0.05, (ts - lastTs) / 1000);
+      lastTs = ts;
+      if (state !== "paused") {
+        update(dt);
+        if (state === "dying" && stateTime > 1.2) afterDeath();
+      }
+      render();
+    }
+
+    /* ---------------- Boot ---------------- */
+    resetDots();
+    peach = { active: false, timeLeft: 0, spawned: false };
+    player = makePlayer();
+    grumps = makeGrumps(false);
+    updateHUD();
+    showStartCard();
+    requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>
