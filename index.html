@@ -475,6 +475,8 @@
 
     function resetPositions(respawn) {
       player = makePlayer();
+      swipeDir = null;          // no leftover direction carries into a fresh turtle
+      holdStack.length = 0;
       grumps = makeGrumps(respawn);
       frightTime = 0; chain = 0; freezeTime = 0;
       popups = [];
@@ -580,7 +582,10 @@
 
     function playerDecide(e, cx, cy) {
       if (e.desired && !isWall(cx + e.desired.x, cy + e.desired.y)) return e.desired;
+      if (!e.desired) { e.dir = null; return null; } // no input held and no swipe set: halt at this center
       if (e.dir && !isWall(cx + e.dir.x, cy + e.dir.y)) return e.dir;
+      // blocked both ways: stop here — a swipe that ran into this wall is spent
+      if (e.desired === swipeDir && holdStack.length === 0) swipeDir = null;
       return null; // stop at this center
     }
 
@@ -1273,13 +1278,73 @@
     }
     function hideOverlay() { overlay.hidden = true; overlay.innerHTML = ""; }
 
-    /* ---------------- Input ---------------- */
-    function setDesired(d) {
+    /* ---------------- Input ----------------
+       Hold-to-move for the D-pad and keyboard: the turtle moves only
+       while a button or key is actively held, and halts at the next
+       tile center once everything is released. A swipe on the board
+       is different — it sets a direction the turtle keeps gliding in
+       until the next swipe or a wall. While a hold is active it takes
+       precedence; on release the turtle falls back to the swipe
+       direction if one is set, otherwise it stops. */
+    var swipeDir = null;   // persistent direction set by a board swipe
+    var holdStack = [];    // active holds { id, dir, btn, pointerId } — most recent wins
+
+    function currentHoldDir() {
+      return holdStack.length ? holdStack[holdStack.length - 1].dir : null;
+    }
+
+    function applyDesired() {
       if (!player) return;
       if (state === "menu") return;
+      var d = currentHoldDir() || swipeDir;
       player.desired = d;
       // instant U-turn, like the arcade original
-      if (player.dir && d === opposite(player.dir)) player.dir = d;
+      if (d && player.dir && d === opposite(player.dir)) player.dir = d;
+    }
+
+    function setDesired(d) { // swipe path: sets the persistent glide direction
+      swipeDir = d;
+      applyDesired();
+    }
+
+    function refreshPad() {
+      dpadBtns.forEach(function (b) {
+        var held = false;
+        for (var i = 0; i < holdStack.length; i++) if (holdStack[i].btn === b) held = true;
+        b.classList.toggle("held", held);
+      });
+    }
+
+    function pressHold(id, d, btn, pointerId) {
+      for (var i = holdStack.length - 1; i >= 0; i--) {
+        if (holdStack[i].id === id) holdStack.splice(i, 1);
+      }
+      holdStack.push({ id: id, dir: d, btn: btn || null, pointerId: pointerId });
+      applyDesired();
+      refreshPad();
+    }
+
+    function releaseHold(id) {
+      var changed = false;
+      for (var i = holdStack.length - 1; i >= 0; i--) {
+        if (holdStack[i].id === id) { holdStack.splice(i, 1); changed = true; }
+      }
+      if (changed) { applyDesired(); refreshPad(); }
+    }
+
+    function releasePointerHolds(pointerId) {
+      var changed = false;
+      for (var i = holdStack.length - 1; i >= 0; i--) {
+        if (holdStack[i].pointerId === pointerId) { holdStack.splice(i, 1); changed = true; }
+      }
+      if (changed) { applyDesired(); refreshPad(); }
+    }
+
+    function clearHolds() {
+      if (!holdStack.length) return;
+      holdStack.length = 0;
+      applyDesired();
+      refreshPad();
     }
 
     // swipe on the board
@@ -1310,21 +1375,21 @@
       touchStart = null;
     }, { passive: true });
 
-    // D-pad (press-and-hold friendly: direction queues on press)
+    // D-pad: hold to move — the turtle moves only while a button is held.
+    // Releases are tracked at window level, so letting go anywhere
+    // (even after sliding off the button) stops the hold.
     var dpadBtns = document.querySelectorAll(".dpad button[data-dir]");
     dpadBtns.forEach(function (btn) {
       var d = DIRS[btn.getAttribute("data-dir")];
-      var press = function (ev) {
+      btn.addEventListener("pointerdown", function (ev) {
         ev.preventDefault();
         audio();
-        setDesired(d);
-        btn.classList.add("held");
-      };
-      btn.addEventListener("pointerdown", press);
-      btn.addEventListener("pointerup", function () { btn.classList.remove("held"); });
-      btn.addEventListener("pointerleave", function () { btn.classList.remove("held"); });
-      btn.addEventListener("pointercancel", function () { btn.classList.remove("held"); });
+        pressHold("pad:" + ev.pointerId, d, btn, ev.pointerId);
+      });
     });
+    window.addEventListener("pointerup", function (ev) { releasePointerHolds(ev.pointerId); });
+    window.addEventListener("pointercancel", function (ev) { releasePointerHolds(ev.pointerId); });
+    window.addEventListener("blur", clearHolds);
 
     // keyboard
     var KEYMAP = {
@@ -1334,13 +1399,22 @@
     };
     document.addEventListener("keydown", function (ev) {
       var d = KEYMAP[ev.key];
-      if (d) { ev.preventDefault(); audio(); setDesired(d); return; }
+      if (d) {
+        ev.preventDefault();
+        audio();
+        if (!ev.repeat) pressHold("key:" + ev.key.toLowerCase(), d, null, null);
+        return;
+      }
       if (ev.key === " " || ev.key === "Enter") {
         if (state === "menu") { ev.preventDefault(); audio(); newGame(); }
         else if (state === "gameover") { ev.preventDefault(); audio(); newGame(); }
       }
       if (ev.key === "p" || ev.key === "P") togglePause();
       if (ev.key === "m" || ev.key === "M") toggleMute();
+    });
+    // hold-to-move: releasing the key ends the hold at the next tile center
+    document.addEventListener("keyup", function (ev) {
+      if (KEYMAP[ev.key]) releaseHold("key:" + ev.key.toLowerCase());
     });
 
     // pause & mute buttons
