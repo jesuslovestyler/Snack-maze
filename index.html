@@ -52,6 +52,25 @@
         margin: 0 auto;
         padding: 10px 10px 30px;
       }
+      .home-row {
+        display: flex;
+        justify-content: flex-start;
+        margin-bottom: 8px;
+      }
+      .home-pill {
+        display: inline-flex;
+        align-items: center;
+        background: var(--panel);
+        border: 2px solid var(--panel-edge);
+        border-radius: 999px;
+        color: var(--ink);
+        font-size: 13.5px;
+        font-weight: 600;
+        line-height: 1;
+        padding: 6px 13px;
+        text-decoration: none;
+      }
+      .home-pill:active { transform: scale(0.96); }
 
       /* ---------- HUD ---------- */
       .hud {
@@ -268,6 +287,9 @@
   </head>
   <body>
     <main class="wrap">
+      <div class="home-row">
+        <a class="home-pill" href="https://jesuslovestyler.com/">⌂ Home</a>
+      </div>
       <!-- HUD -->
       <div class="hud">
         <div class="hud-main">
@@ -1463,5 +1485,6 @@
     showStartCard();
     requestAnimationFrame(frame);
     </script>
+    <script data-goatcounter="https://jesuslovestyler.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
   </body>
 </html>
